@@ -1,0 +1,8 @@
+-r requirements.in
+
+# Testing
+pytest>=8.0.0
+freezegun>=1.4.0
+
+# Development tools
+pip-tools>=7.4.0 

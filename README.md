@@ -4,8 +4,28 @@ RetroGit is a git wrapper that helps you create commits with dates spread across
 
 ## Installation
 
+First, create and activate a virtual environment:
+
 ```bash
-pip install -r requirements.txt
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### Basic Installation
+
+For users who just want to use the tool:
+
+```bash
+pip-sync requirements.txt
+```
+
+### Development Installation
+
+For contributors who want to run tests and modify the code:
+
+```bash
+pip install pip-tools
+pip-sync requirements_dev.txt
 ```
 
 ## Usage
@@ -57,3 +77,25 @@ The configuration directory will be automatically created when you first run the
 ## How it works
 
 RetroGit takes your commits and automatically sets their dates to a time in the past, maintaining a natural-looking commit frequency based on your configuration. It starts from your last commit date (or repository creation date) and spaces out new commits according to your specified interval and randomness settings. For the first commit in a repository, it starts from `initial_backdate_days` ago.
+
+## Contributing
+
+Dependencies are managed using pip-tools. We have two requirement files:
+
+- `requirements.in`: Core dependencies needed to run the tool
+- `requirements_dev.in`: Additional dependencies for development (testing tools, etc.)
+
+To update dependencies:
+
+1. Edit the `.in` files as needed
+2. Recompile the requirements:
+   ```bash
+   pip-compile requirements.in        # Update core dependencies
+   pip-compile requirements_dev.in    # Update development dependencies
+   ```
+3. Sync your virtual environment:
+   ```bash
+   pip-sync requirements_dev.txt  # For development work
+   # or
+   pip-sync requirements.txt      # For basic usage
+   ```
