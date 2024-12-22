@@ -99,3 +99,29 @@ To update dependencies:
    # or
    pip-sync requirements.txt      # For basic usage
    ```
+
+### Development Tasks
+
+We use tox to automate all development tasks. To run everything:
+
+```bash
+tox
+```
+
+This will:
+
+1. Run tests on Python 3.9-3.12
+2. Format code with black and isort
+3. Run linting with flake8
+4. Run type checking with mypy
+
+You can also run specific tasks:
+
+```bash
+tox -e py312        # Run tests on Python 3.12 only
+tox -e format       # Run formatters only
+tox -e lint         # Run linting only
+tox -e type         # Run type checking only
+```
+
+All configuration for these tools is in `pyproject.toml`.

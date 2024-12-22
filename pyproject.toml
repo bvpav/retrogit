@@ -1,0 +1,132 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retrogit"
+version = "0.1.0"
+description = "A git wrapper that helps you create commits with dates spread across a past time period"
+requires-python = ">=3.9"
+dependencies = [
+    "toml>=0.10.2",
+    "python-dateutil>=2.8.2",
+    "gitpython>=3.1.31",
+]
+
+[project.scripts]
+retrogit = "retrogit:main"
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+# A regex preceded with ^/ will apply only to files and directories
+# in the root of the project.
+^/venv
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip = ["venv"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = [
+    # See https://github.com/PyCQA/pycodestyle/issues/373
+    "E203",  # Whitespace before ':'
+    "D100",  # Missing docstring in public module
+    "D104",  # Missing docstring in public package
+    "B008",  # Do not perform function calls in argument defaults (breaks with Click)
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    "venv",
+]
+per-file-ignores = [
+    # Don't require docstrings in tests
+    "tests/*:D100,D101,D102,D103",
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false  # Allow untyped decorators for pytest
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "git.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pytest.*"
+ignore_missing_imports = true
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+min_version = 4.0
+env_list = 
+    py{39,310,311,312}
+    format
+    lint
+    type
+isolated_build = True
+
+[testenv]
+description = Run tests with pytest
+deps = 
+    -r requirements_dev.txt
+commands = 
+    pytest {posargs:tests}
+
+[testenv:format]
+description = Format code with black and isort
+deps = 
+    black>=24.2.0
+    isort>=5.13.0
+commands = 
+    black .
+    isort .
+skip_install = true
+
+[testenv:lint]
+description = Run all linting tools
+deps = 
+    flake8>=7.0.0
+    flake8-bugbear>=24.2.0
+    flake8-comprehensions>=3.14.0
+    flake8-docstrings>=1.7.0
+commands = 
+    flake8 retrogit tests
+skip_install = true
+
+[testenv:type]
+description = Run type checking with mypy
+deps = 
+    mypy>=1.9.0
+    types-toml>=0.10.8.7
+    types-python-dateutil>=2.8.19.20240106
+    types-freezegun>=1.1.10
+commands = 
+    mypy retrogit tests
+skip_install = true
+"""
