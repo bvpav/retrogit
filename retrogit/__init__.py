@@ -72,14 +72,28 @@ def load_config() -> Config:
         return cast(Config, toml.load(f))
 
 
-def get_last_commit_date() -> datetime:
-    """Get the date of the last commit, or a reasonable starting date if no commits exist."""
+def get_last_commit_date(skip_last: bool = False) -> datetime:
+    """Get the date of the last commit, or a reasonable starting date if no commits exist.
+    
+    Args:
+        skip_last: If True, skip the most recent commit and use the second-to-last commit's date.
+                  This is useful for post-commit hooks where the most recent commit is the one we want to amend.
+    """
     try:
         repo = git.Repo(".")
         try:
-            last_commit = next(repo.iter_commits())
-            # GitPython's committed_datetime is always timezone-aware
-            return cast(datetime, last_commit.committed_datetime)
+            commits = list(repo.iter_commits(max_count=2))  # Get up to 2 commits
+            if not commits:
+                # No commits yet - start from initial_backdate_days ago
+                config = load_config()
+                backdate_days = config["timing"].get("initial_backdate_days", 30)
+                return datetime.now() - timedelta(days=backdate_days)
+            
+            # If skip_last is True and we have at least 2 commits, use the second-to-last commit
+            if skip_last and len(commits) > 1:
+                return cast(datetime, commits[1].committed_datetime)
+            # Otherwise use the most recent commit
+            return cast(datetime, commits[0].committed_datetime)
         except (StopIteration, ValueError):
             # No commits yet - start from initial_backdate_days ago
             config = load_config()
@@ -101,10 +115,15 @@ def calculate_next_commit_date(last_date: datetime, config: Config) -> datetime:
     return last_date + timedelta(days=actual_interval)
 
 
-def setup_git_dates() -> str:
-    """Set up the git dates for the next commit."""
+def setup_git_dates(skip_last: bool = False) -> str:
+    """Set up the git dates for the next commit.
+    
+    Args:
+        skip_last: If True, skip the most recent commit and use the second-to-last commit's date.
+                  This is useful for post-commit hooks where the most recent commit is the one we want to amend.
+    """
     config = load_config()
-    last_date = get_last_commit_date()
+    last_date = get_last_commit_date(skip_last=skip_last)
     next_date = calculate_next_commit_date(last_date, config)
     date_str = next_date.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -121,7 +140,7 @@ def cmd_commit() -> NoReturn:
         print("Usage: retrogit commit [git commit arguments]")
         sys.exit(1)
 
-    setup_git_dates()
+    setup_git_dates(skip_last=False)  # Explicitly set skip_last=False for direct commits
 
     # Prepare the git commit command with our custom date
     git_args = ["git", "commit"] + sys.argv[2:]
@@ -135,22 +154,41 @@ def cmd_commit() -> NoReturn:
         sys.exit(e.returncode)
 
 
-def cmd_pre_commit() -> NoReturn:
-    """Handle the pre-commit hook."""
+def cmd_post_commit() -> NoReturn:
+    """Handle the post-commit hook."""
+    if "GIT_AUTHOR_DATE" not in os.environ:
+        print(
+            "RetroGit: Must be run as a post-commit hook. Install the hook using `retrogit install`",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # If we are ammending a commit already, avoid amending it again
+    if os.environ.get("RETROGIT_COMMIT_AMENDED") == "1":
+        sys.exit(0)
+
     try:
-        date_str = setup_git_dates()
-        print(f"RetroGit: Setting commit date to {date_str}")
+        date_str = setup_git_dates(skip_last=True)  # Use skip_last=True for post-commit hook
+
+        print(f"RetroGit: Setting commit date to {date_str} and amending commit")
+        env = os.environ.copy()
+        env["RETROGIT_COMMIT_AMENDED"] = "1"  # Prevent infinite loops
+        subprocess.run(
+            ["git", "commit", "--amend", "--no-edit", "--date", date_str],
+            env=env,
+            check=True,
+        )
         sys.exit(0)
     except Exception as e:
-        print(f"RetroGit pre-commit hook error: {str(e)}", file=sys.stderr)
+        print(f"RetroGit post-commit hook error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 
 def cmd_install_hook() -> NoReturn:
-    """Install the pre-commit hook."""
+    """Install the post-commit hook."""
     try:
         repo = git.Repo(".")
-        hook_path = Path(repo.git_dir) / "hooks" / "pre-commit"
+        hook_path = Path(repo.git_dir) / "hooks" / "post-commit"
 
         # Create hooks directory if it doesn't exist
         hook_path.parent.mkdir(parents=True, exist_ok=True)
@@ -159,17 +197,17 @@ def cmd_install_hook() -> NoReturn:
         with open(hook_path, "w") as f:
             f.write(
                 f"""#!/bin/sh
-# RetroGit pre-commit hook
-{sys.executable} {os.path.abspath(__file__)} pre-commit
+# RetroGit post-commit hook
+{sys.executable} {os.path.abspath(__file__)} post-commit
 """
             )
 
         # Make the hook executable
         hook_path.chmod(0o755)
-        print(f"Pre-commit hook installed at {hook_path}")
+        print(f"Post-commit hook installed at {hook_path}")
         sys.exit(0)
     except Exception as e:
-        print(f"Failed to install pre-commit hook: {str(e)}", file=sys.stderr)
+        print(f"Failed to install post-commit hook: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -178,16 +216,16 @@ def main() -> NoReturn:
     if len(sys.argv) < 2:
         print("Usage: retrogit <command> [arguments]")
         print("\nCommands:")
-        print("  commit     - Commit with a backdated timestamp")
-        print("  pre-commit - Run as a pre-commit hook")
-        print("  install    - Install the pre-commit hook")
+        print("  commit      - Commit with a backdated timestamp")
+        print("  post-commit - Run as a post-commit hook")
+        print("  install     - Install the post-commit hook")
         sys.exit(1)
 
     command = sys.argv[1]
     if command == "commit":
         cmd_commit()
-    elif command == "pre-commit":
-        cmd_pre_commit()
+    elif command == "post-commit":
+        cmd_post_commit()
     elif command == "install":
         cmd_install_hook()
     else:

@@ -42,15 +42,15 @@ retrogit commit -m "Your commit message"
 
 All normal git commit arguments are supported.
 
-### 2. Pre-commit Hook
+### 2. Post-commit Hook
 
-Alternatively, you can install RetroGit as a pre-commit hook, which will automatically set the commit dates when you use regular `git commit`:
+Alternatively, you can install RetroGit as a post-commit hook, which will automatically amend your commit with a backdated timestamp after you use regular `git commit`:
 
 ```bash
 retrogit install
 ```
 
-This will install the pre-commit hook in your repository. After installation, you can just use `git commit` normally, and RetroGit will automatically set the commit dates.
+This will install the post-commit hook in your repository. After installation, you can just use `git commit` normally, and RetroGit will automatically amend your commit with a backdated timestamp.
 
 ## Configuration
 
